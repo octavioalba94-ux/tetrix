@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tetris Pro</title>
+  <style>
+    :root {
+      --bg-color: #0b0e14;
+      --panel-bg: #151922;
+      --accent-color: #00f0ff;
+      --text-color: #ffffff;
+      --border-color: #2a2e3d;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      display: flex;
+      gap: 20px;
+      background-color: var(--panel-bg);
+      padding: 25px;
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6),
+                  0 0 20px rgba(0, 240, 255, 0.1);
+      border: 1px solid var(--border-color);
+    }
+
+    .game-board {
+      position: relative;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+      background-color: #000;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      width: 160px;
+    }
+
+    .panel-box {
+      background-color: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 15px;
+      text-align: center;
+      margin-bottom: 15px;
+    }
+
+    .panel-box h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #8a8f9d;
+      margin-bottom: 8px;
+    }
+
+    .panel-box .value {
+      font-size: 22px;
+      font-weight: bold;
+      color: var(--accent-color);
+      text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+    }
+
+    .next-canvas {
+      margin: 0 auto;
+      display: block;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #00f0ff, #0072ff);
+      border: none;
+      border-radius: 8px;
+      color: #white;
+      font-weight: bold;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 15px rgba(0, 240, 255, 0.3);
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 240, 255, 0.5);
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .controls-hint {
+      font-size: 11px;
+      color: #6c727f;
+      line-height: 1.5;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="game-board">
+      <canvas id="tetris" width="240" height="400"></canvas>
+    </div>
+
+    <div class="sidebar">
+      <div>
+        <div class="panel-box">
+          <h3>Siguiente</h3>
+          <canvas id="next" width="80" height="80" class="next-canvas"></canvas>
+        </div>
+        <div class="panel-box">
+          <h3>Puntos</h3>
+          <div id="score" class="value">0</div>
+        </div>
+        <div class="panel-box">
+          <h3>Nivel</h3>
+          <div id="level" class="value">1</div>
+        </div>
+        <div class="panel-box">
+          <h3>Líneas</h3>
+          <div id="lines" class="value">0</div>
+        </div>
+      </div>
+
+      <div>
+        <button id="start-btn" class="btn">Reiniciar</button>
+        <div class="controls-hint" style="margin-top: 15px;">
+          ← → : Mover<br>
+          ↑ : Rotar<br>
+          ↓ : Bajar
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('tetris');
+    const context = canvas.getContext('2d');
+    const nextCanvas = document.getElementById('next');
+    const nextContext = nextCanvas.getContext('2d');
+
+    context.scale(20, 20);
+    nextContext.scale(20, 20);
+
+    const COLORS = [
+      null,
+      '#FF0D72', // I
+      '#0DC2FF', // J
+      '#0DFF72', // L
+      '#F538FF', // O
+      '#FF8E0D', // S
+      '#FFE138', // T
+      '#3877FF'  // Z
+    ];
+
+    const PIECES = 'ILJOTSZ';
+
+    function createMatrix(w, h) {
+      const matrix = [];
+      while (h--) {
+        matrix.push(new Array(w).fill(0));
+      }
+      return matrix;
+    }
+
+    function createPiece(type) {
+      if (type === 'I') {
+        return [
+          [0, 1, 0, 0],
+          [0, 1, 0, 0],
+          [0, 1, 0, 0],
+          [0, 1, 0, 0],
+        ];
+      } else if (type === 'L') {
+        return [
+          [0, 2, 0],
+          [0, 2, 0],
+          [0, 2, 2],
+        ];
+      } else if (type === 'J') {
+        return [
+          [0, 3, 0],
+          [0, 3, 0],
+          [3, 3, 0],
+        ];
+      } else if (type === 'O') {
+        return [
+          [4, 4],
+          [4, 4],
+        ];
+      } else if (type === 'Z') {
+        return [
+          [5, 5, 0],
+          [0, 5, 5],
+          [0, 0, 0],
+        ];
+      } else if (type === 'S') {
+        return [
+          [0, 6, 6],
+          [6, 6, 0],
+          [0, 0, 0],
+        ];
+      } else if (type === 'T') {
+        return [
+          [0, 7, 0],
+          [7, 7, 7],
+          [0, 0, 0],
+        ];
+      }
+    }
+
+    const arena = createMatrix(12, 20);
+
+    const player = {
+      pos: {x: 0, y: 0},
+      matrix: null,
+      nextMatrix: null,
+      score: 0,
+      lines: 0,
+      level: 1
+    };
+
+    function collide(arena, player) {
+      const [m, o] = [player.matrix, player.pos];
+      for (let y = 0; y < m.length; ++y) {
+        for (let x = 0; x < m[y].length; ++x) {
+          if (m[y][x] !== 0 &&
+             (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function arenaSweep() {
+      let rowCount = 1;
+      outer: for (let y = arena.length - 1; y > 0; --y) {
+        for (let x = 0; x < arena[y].length; ++x) {
+          if (arena[y][x] === 0) {
+            continue outer;
+          }
+        }
+        const row = arena.splice(y, 1)[0].fill(0);
+        arena.unshift(row);
+        ++y;
+
+        player.score += rowCount * 100;
+        player.lines++;
+        rowCount *= 2;
+      }
+      player.level = Math.floor(player.lines / 10) + 1;
+      updateScore();
+    }
+
+    function drawMatrix(matrix, offset, ctx) {
+      matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value !== 0) {
+            ctx.fillStyle = COLORS[value];
+            ctx.fillRect(x + offset.x, y + offset.y, 0.9, 0.9);
+            
+            // Efecto de bisel/brillo interior
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.fillRect(x + offset.x, y + offset.y, 0.9, 0.15);
+            ctx.fillRect(x + offset.x, y + offset.y, 0.15, 0.9);
+          }
+        });
+      });
+    }
